@@ -1,0 +1,7 @@
+# data.yaml
+path: /root/code/.code/dataset
+train: /root/code/.code/dataset/train/images
+val: /root/code/.code/dataset/dataset/val/images
+test: /root/code/.code/dataset/test/images
+nc: 11
+names: ['bud', 'initial flower', 'bloom flower', 'whiter flower', 'fruit', 'tea gall', 'sooty blotch', 'soft rot', 'anthracnose', 'algal spot disease', 'pest damage']  # 类别名称列表

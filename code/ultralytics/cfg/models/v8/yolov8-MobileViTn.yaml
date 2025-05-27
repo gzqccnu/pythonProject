@@ -1,0 +1,52 @@
+# Ultralytics YOLO 🚀, AGPL-3.0 license
+# YOLOv8 object detection model with P3-P5 outputs. For Usage examples see https://docs.ultralytics.com/tasks/detect
+
+# Parameters
+nc: 11  # number of classes
+scales:
+  n: [1.0, 1.0, 1.0]  # depth_multiple, width_multiple, max_channels (Removed max_channels, assumed standard handling)
+  # Add other scales if needed (s, m, l, x)
+
+# Modify depth_multiple and width_multiple if using scales other than 'n'
+depth_multiple: 1.0  # model depth multiple (adjust based on selected scale)
+width_multiple: 1.0  # layer channel multiple (adjust based on selected scale)
+
+# Backbone
+backbone:
+  # [from, repeats, module, args] # args are based on module's __init__ signature interpretation
+  - [-1, 1, Conv, [16, 3, 2]]  # 0-P1/2. Output: B, 16, H/2, W/2
+  - [-1, 1, MV2Block, [32, 1, 4]]  # 1. Input: 16. Output: B, 32, H/2, W/2
+  - [-1, 1, MV2Block, [48, 2, 4]]  # 2-P2. Input: 32. Output: B, 48, H/4, W/4
+  - [-1, 1, MV2Block, [48, 1, 4]]  # 3. Input: 48. Output: B, 48, H/4, W/4
+  - [-1, 1, MV2Block, [48, 1, 4]]  # 4. Input: 48. Output: B, 48, H/4, W/4
+  - [-1, 1, MV2Block, [64, 2, 4]]  # 5-P3 stem. Input: 48. Output: B, 64, H/8, W/8
+
+  # Assuming MobileViTBlock args are [dim, depth, kernel_size, patch_size, mlp_dim, dropout]
+  # and 'channel' is inferred from input tensor (c_in)
+  - [-1, 1, MobileViTBlock, [96, 2, 3, 2, 192, 0]] # 6. Input: 64. Output: B, 64, H/8, W/8 (dim=96)
+  - [-1, 1, MV2Block, [80, 2, 4]]  # 7-P4 stem. Input: 64. Output: B, 80, H/16, W/16
+
+  - [-1, 1, MobileViTBlock, [120, 4, 3, 2, 240, 0]] # 8. Input: 80. Output: B, 80, H/16, W/16 (dim=120)
+  - [-1, 1, MV2Block, [96, 2, 4]]  # 9-P5 stem. Input: 80. Output: B, 96, H/32, W/32
+
+  - [-1, 1, MobileViTBlock, [144, 3, 3, 2, 288, 0]] # 10. Input: 96. Output: B, 96, H/32, W/32 (dim=144, changed patch_size from 1 to 2)
+
+# Head
+head:
+  - [-1, 1, nn.Upsample, [None, 2, 'nearest']] # Input: Layer 10 (B, 96, H/32, W/32). Output: B, 96, H/16, W/16
+  - [[-1, 8], 1, Concat, [1]]  # Concat(Layer 11, Layer 8). Input: (B, 96, H/16, W/16), (B, 80, H/16, W/16). Output: B, 176, H/16, W/16
+  - [-1, 1, C2f, [72]]  # 13. Input: 176. Output: B, 72, H/16, W/16 (Assuming C2f handles channel reduction)
+
+  - [-1, 1, nn.Upsample, [None, 2, 'nearest']] # Input: Layer 13 (B, 72, H/16, W/16). Output: B, 72, H/8, W/8
+  - [[-1, 6], 1, Concat, [1]]  # Concat(Layer 14, Layer 6). Input: (B, 72, H/8, W/8), (B, 64, H/8, W/8). Output: B, 136, H/8, W/8
+  - [-1, 1, C2f, [36]]  # 16 (P3/8-small). Input: 136. Output: B, 36, H/8, W/8
+
+  - [-1, 1, Conv, [36, 3, 2]] # Input: Layer 16 (B, 36, H/8, W/8). Output: B, 36, H/16, W/16
+  - [[-1, 13], 1, Concat, [1]] # Concat(Layer 17, Layer 13). Input: (B, 36, H/16, W/16), (B, 72, H/16, W/16). Output: B, 108, H/16, W/16
+  - [-1, 1, C2f, [72]]  # 19 (P4/16-medium). Input: 108. Output: B, 72, H/16, W/16
+
+  - [-1, 1, Conv, [72, 3, 2]] # Input: Layer 19 (B, 72, H/16, W/16). Output: B, 72, H/32, W/32
+  - [[-1, 10], 1, Concat, [1]] # Concat(Layer 20, Layer 10). Input: (B, 72, H/32, W/32), (B, 96, H/32, W/32). Output: B, 168, H/32, W/32
+  - [-1, 1, C2f, [144]] # 22 (P5/32-large). Input: 168. Output: B, 144, H/32, W/32
+
+  - [[16, 19, 22], 1, Detect, [nc]]  # Detect(P3, P4, P5)

@@ -1,0 +1,7 @@
+# data.yaml
+path: F:\mydata
+train: images/train
+val: images/val
+test: images/test
+nc: 11
+names: ['bud', 'initial flower', 'bloom flower', 'whiter flower', 'fruit', 'tea gall', 'sooty blotch', 'soft rot', 'anthracnose', 'algal spot disease', 'pest damage']  # 类别名称列表
